@@ -1,9 +1,14 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 import Icon from '@/components/ui/icon';
 
 interface Product {
@@ -19,7 +24,7 @@ interface Product {
   isOnSale?: boolean;
 }
 
-const products: Product[] = [
+const initialProducts: Product[] = [
   {
     id: 1,
     name: 'Классическая рубашка',
@@ -89,11 +94,26 @@ const products: Product[] = [
 ];
 
 export default function Index() {
+  const [products, setProducts] = useState<Product[]>(initialProducts);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedBrand, setSelectedBrand] = useState<string>('all');
   const [selectedColor, setSelectedColor] = useState<string>('all');
   const [priceRange, setPriceRange] = useState<number[]>([0, 15000]);
   const [currentSection, setCurrentSection] = useState<string>('home');
+  const [isAdminMode, setIsAdminMode] = useState<boolean>(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [isAddingProduct, setIsAddingProduct] = useState<boolean>(false);
+  const [newProduct, setNewProduct] = useState<Partial<Product>>({
+    name: '',
+    price: 0,
+    originalPrice: undefined,
+    image: '/placeholder.svg',
+    category: 'men',
+    size: [],
+    color: '',
+    brand: '',
+    isOnSale: false,
+  });
 
   const filteredProducts = products.filter(product => {
     if (selectedCategory !== 'all' && product.category !== selectedCategory) return false;
@@ -102,6 +122,68 @@ export default function Index() {
     if (product.price < priceRange[0] || product.price > priceRange[1]) return false;
     return true;
   });
+
+  const handleAddProduct = () => {
+    if (newProduct.name && newProduct.price && newProduct.color && newProduct.brand) {
+      const product: Product = {
+        id: Math.max(...products.map(p => p.id)) + 1,
+        name: newProduct.name,
+        price: newProduct.price,
+        originalPrice: newProduct.originalPrice,
+        image: newProduct.image || '/placeholder.svg',
+        category: newProduct.category as 'men' | 'women',
+        size: newProduct.size || [],
+        color: newProduct.color,
+        brand: newProduct.brand,
+        isOnSale: newProduct.isOnSale || false,
+      };
+      setProducts([...products, product]);
+      setNewProduct({
+        name: '',
+        price: 0,
+        originalPrice: undefined,
+        image: '/placeholder.svg',
+        category: 'men',
+        size: [],
+        color: '',
+        brand: '',
+        isOnSale: false,
+      });
+      setIsAddingProduct(false);
+    }
+  };
+
+  const handleEditProduct = (product: Product) => {
+    setEditingProduct(product);
+    setNewProduct(product);
+  };
+
+  const handleUpdateProduct = () => {
+    if (editingProduct && newProduct.name && newProduct.price && newProduct.color && newProduct.brand) {
+      const updatedProducts = products.map(p => 
+        p.id === editingProduct.id 
+          ? { ...editingProduct, ...newProduct } 
+          : p
+      );
+      setProducts(updatedProducts);
+      setEditingProduct(null);
+      setNewProduct({
+        name: '',
+        price: 0,
+        originalPrice: undefined,
+        image: '/placeholder.svg',
+        category: 'men',
+        size: [],
+        color: '',
+        brand: '',
+        isOnSale: false,
+      });
+    }
+  };
+
+  const handleDeleteProduct = (id: number) => {
+    setProducts(products.filter(p => p.id !== id));
+  };
 
   const navItems = [
     { id: 'home', label: 'Главная', icon: 'Home' },
@@ -150,6 +232,16 @@ export default function Index() {
                   3
                 </Badge>
               </Button>
+              <div className="flex items-center space-x-2 ml-4">
+                <Switch
+                  checked={isAdminMode}
+                  onCheckedChange={setIsAdminMode}
+                  id="admin-mode"
+                />
+                <Label htmlFor="admin-mode" className="text-sm font-opensans">
+                  Админ
+                </Label>
+              </div>
             </div>
           </div>
         </div>
@@ -179,6 +271,139 @@ export default function Index() {
           </div>
         </div>
       </section>
+
+      {/* Admin Panel */}
+      {isAdminMode && (
+        <section className="py-8 bg-coral/10 border-b-2 border-coral/20">
+          <div className="container mx-auto px-4">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-2xl font-montserrat font-semibold text-coral">
+                <Icon name="Settings" className="inline mr-2" size={24} />
+                Управление товарами
+              </h3>
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button className="bg-coral hover:bg-coral/90" onClick={() => setIsAddingProduct(true)}>
+                    <Icon name="Plus" className="mr-2" size={18} />
+                    Добавить товар
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Добавить новый товар</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="name">Название товара</Label>
+                      <Input
+                        id="name"
+                        value={newProduct.name || ''}
+                        onChange={(e) => setNewProduct({...newProduct, name: e.target.value})}
+                        placeholder="Введите название"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="price">Цена (₽)</Label>
+                        <Input
+                          id="price"
+                          type="number"
+                          value={newProduct.price || ''}
+                          onChange={(e) => setNewProduct({...newProduct, price: Number(e.target.value)})}
+                          placeholder="0"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="originalPrice">Старая цена (₽)</Label>
+                        <Input
+                          id="originalPrice"
+                          type="number"
+                          value={newProduct.originalPrice || ''}
+                          onChange={(e) => setNewProduct({...newProduct, originalPrice: Number(e.target.value)})}
+                          placeholder="Необязательно"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label htmlFor="brand">Бренд</Label>
+                      <Input
+                        id="brand"
+                        value={newProduct.brand || ''}
+                        onChange={(e) => setNewProduct({...newProduct, brand: e.target.value})}
+                        placeholder="Введите бренд"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="color">Цвет</Label>
+                        <Input
+                          id="color"
+                          value={newProduct.color || ''}
+                          onChange={(e) => setNewProduct({...newProduct, color: e.target.value})}
+                          placeholder="Введите цвет"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="category">Категория</Label>
+                        <Select 
+                          value={newProduct.category} 
+                          onValueChange={(value) => setNewProduct({...newProduct, category: value as 'men' | 'women'})}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="men">Мужское</SelectItem>
+                            <SelectItem value="women">Женское</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div>
+                      <Label htmlFor="sizes">Размеры (через запятую)</Label>
+                      <Input
+                        id="sizes"
+                        value={newProduct.size?.join(', ') || ''}
+                        onChange={(e) => setNewProduct({...newProduct, size: e.target.value.split(',').map(s => s.trim())})}
+                        placeholder="S, M, L, XL"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="image">URL изображения</Label>
+                      <Input
+                        id="image"
+                        value={newProduct.image || ''}
+                        onChange={(e) => setNewProduct({...newProduct, image: e.target.value})}
+                        placeholder="/placeholder.svg"
+                      />
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        checked={newProduct.isOnSale || false}
+                        onCheckedChange={(checked) => setNewProduct({...newProduct, isOnSale: checked})}
+                        id="isOnSale"
+                      />
+                      <Label htmlFor="isOnSale">Товар на распродаже</Label>
+                    </div>
+                    <div className="flex gap-2 pt-4">
+                      <Button onClick={handleAddProduct} className="flex-1">
+                        Добавить товар
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        onClick={() => setIsAddingProduct(false)}
+                        className="flex-1"
+                      >
+                        Отмена
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Filters */}
       <section className="py-8 bg-muted/30">
@@ -263,9 +488,138 @@ export default function Index() {
                     </Badge>
                   )}
                   <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    <Button variant="secondary" size="icon" className="rounded-full shadow-md">
-                      <Icon name="Heart" size={16} />
-                    </Button>
+                    {isAdminMode ? (
+                      <div className="flex gap-2">
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button 
+                              variant="secondary" 
+                              size="icon" 
+                              className="rounded-full shadow-md"
+                              onClick={() => handleEditProduct(product)}
+                            >
+                              <Icon name="Edit" size={16} />
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-md">
+                            <DialogHeader>
+                              <DialogTitle>Редактировать товар</DialogTitle>
+                            </DialogHeader>
+                            <div className="space-y-4">
+                              <div>
+                                <Label htmlFor="edit-name">Название товара</Label>
+                                <Input
+                                  id="edit-name"
+                                  value={newProduct.name || ''}
+                                  onChange={(e) => setNewProduct({...newProduct, name: e.target.value})}
+                                />
+                              </div>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <Label htmlFor="edit-price">Цена (₽)</Label>
+                                  <Input
+                                    id="edit-price"
+                                    type="number"
+                                    value={newProduct.price || ''}
+                                    onChange={(e) => setNewProduct({...newProduct, price: Number(e.target.value)})}
+                                  />
+                                </div>
+                                <div>
+                                  <Label htmlFor="edit-originalPrice">Старая цена (₽)</Label>
+                                  <Input
+                                    id="edit-originalPrice"
+                                    type="number"
+                                    value={newProduct.originalPrice || ''}
+                                    onChange={(e) => setNewProduct({...newProduct, originalPrice: Number(e.target.value)})}
+                                  />
+                                </div>
+                              </div>
+                              <div>
+                                <Label htmlFor="edit-brand">Бренд</Label>
+                                <Input
+                                  id="edit-brand"
+                                  value={newProduct.brand || ''}
+                                  onChange={(e) => setNewProduct({...newProduct, brand: e.target.value})}
+                                />
+                              </div>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <Label htmlFor="edit-color">Цвет</Label>
+                                  <Input
+                                    id="edit-color"
+                                    value={newProduct.color || ''}
+                                    onChange={(e) => setNewProduct({...newProduct, color: e.target.value})}
+                                  />
+                                </div>
+                                <div>
+                                  <Label htmlFor="edit-category">Категория</Label>
+                                  <Select 
+                                    value={newProduct.category} 
+                                    onValueChange={(value) => setNewProduct({...newProduct, category: value as 'men' | 'women'})}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="men">Мужское</SelectItem>
+                                      <SelectItem value="women">Женское</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              </div>
+                              <div>
+                                <Label htmlFor="edit-sizes">Размеры (через запятую)</Label>
+                                <Input
+                                  id="edit-sizes"
+                                  value={newProduct.size?.join(', ') || ''}
+                                  onChange={(e) => setNewProduct({...newProduct, size: e.target.value.split(',').map(s => s.trim())})}
+                                />
+                              </div>
+                              <div>
+                                <Label htmlFor="edit-image">URL изображения</Label>
+                                <Input
+                                  id="edit-image"
+                                  value={newProduct.image || ''}
+                                  onChange={(e) => setNewProduct({...newProduct, image: e.target.value})}
+                                />
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <Switch
+                                  checked={newProduct.isOnSale || false}
+                                  onCheckedChange={(checked) => setNewProduct({...newProduct, isOnSale: checked})}
+                                  id="edit-isOnSale"
+                                />
+                                <Label htmlFor="edit-isOnSale">Товар на распродаже</Label>
+                              </div>
+                              <div className="flex gap-2 pt-4">
+                                <Button onClick={handleUpdateProduct} className="flex-1">
+                                  Сохранить
+                                </Button>
+                                <Button 
+                                  variant="outline" 
+                                  onClick={() => setEditingProduct(null)}
+                                  className="flex-1"
+                                >
+                                  Отмена
+                                </Button>
+                              </div>
+                            </div>
+                          </DialogContent>
+                        </Dialog>
+                        <Button 
+                          variant="destructive" 
+                          size="icon" 
+                          className="rounded-full shadow-md"
+                          onClick={() => handleDeleteProduct(product.id)}
+                        >
+                          <Icon name="Trash" size={16} />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button variant="secondary" size="icon" className="rounded-full shadow-md">
+                        <Icon name="Heart" size={16} />
+                      </Button>
+                    )}
                   </div>
                 </div>
                 
